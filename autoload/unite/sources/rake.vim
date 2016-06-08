@@ -15,6 +15,7 @@ let s:source = {
       \ 'description' : 'list rake tasks',
       \ 'default_kind' : 'command',
       \ 'hooks' : {},
+      \ 'syntax' : 'uniteRake_Rake'
       \}
 
 let s:job = {'pty': 1, 'TERM': 'xterm-256color'} "{{{
@@ -54,6 +55,16 @@ function s:job.new() "{{{
   return instance
 endfunction "}}}
 "}}}
+function! s:source.hooks.on_syntax(args, context) abort "{{{
+  syntax match uniteRake_RakeDescriptionLine / -- .*$/
+        \ contained containedin=uniteRake_Rake
+  syntax match uniteRake_RakeDescription /.*$/
+        \ contained containedin=uniteRake_RakeDescriptionLine
+  syntax match uniteRake_RakeMarker / -- /
+        \ contained containedin=uniteRake_RakeDescriptionLine
+  highlight default link uniteRake_RakeMarker Special
+  highlight default link uniteRake_RakeDescription Comment
+endfunction"}}}
 function! s:source.gather_candidates(args, context) abort "{{{
   if a:context.is_redraw
     let a:context.is_async = 1
@@ -85,8 +96,7 @@ function! s:source.async_gather_candidates(args, context) abort "{{{
 
   let candidates = map(tasks_data, "{
         \ 'word' : v:val.task,
-        \ 'abbr' : unite#util#truncate(v:val.task, 60) .
-        \         (v:val.description != '' ? ' -- ' . v:val.description : ''),
+        \ 'abbr' : self.format_abbr(v:val),
         \ 'action__command' : self.run_rake_task(v:val.task)
         \ }")
 
@@ -100,6 +110,13 @@ function! s:source.hooks.on_close(args, context) abort "{{{
     endif
   endif
 endfunction "}}}
+function! s:source.format_abbr(task_data) abort "{{{
+  let abbr = a:task_data.task
+  if a:task_data.description != ''
+    let abbr = abbr . " -- " . a:task_data.description
+  endif
+  return abbr
+endfunction "}}}
 function! s:source.parse_line(data) abort "{{{
   let sanitizedData = s:String.replace_first(a:data, "rake", '')
   let tokens = s:String.nsplit(sanitizedData, 2, '#')
@@ -112,6 +129,6 @@ function! s:source.parse_line(data) abort "{{{
 endfunction "}}}
 function! s:source.run_rake_task(data) abort "{{{
   let sanitizedStr = s:String.replace(a:data, ":", '\:')
-  return "Unite -multi-line output/shellcmd:rake\\ " . sanitizedStr
+  return "Unite -no-truncate -no-focus -buffer-name=" . a:data . " output/shellcmd:rake\\ " . sanitizedStr
 endfunction "}}}
 
